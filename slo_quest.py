@@ -190,8 +190,10 @@ def get_sloth_status():
     """
     [함수 역할] 일정의 상태에 따라 나무늘보의 기분을 결정합니다.
     - dead: 기한 초과 일정(과거 날짜의 미완료 일정)이 있는 경우
-    - nervous: 마감이 오늘 또는 내일인 미완료 일정이 있는 경우
-    - happy: 그 외의 경우 (평화로움)
+    - angry: 마감이 오늘인 미완료 일정(D-Day)이 있는 경우
+    - nervous: 마감이 내일인 미완료 일정(D-1)이 있는 경우
+    - happy_heart: 모든 과제를 끝냈을 때
+    - happy: 과제가 없는 경우 또는 그 외 평상시
     """
     try:
         today = datetime.date.today()
@@ -199,23 +201,44 @@ def get_sloth_status():
         tomorrow_str = (
             today + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
 
+        quests = app_state.get("quest_list", [])
+
+        # 1. 기한 초과 일정(과거 날짜의 미완료 일정)이 있는 경우
         overdue = [
-            q for q in app_state["quest_list"]
+            q for q in quests
             if q["due_date"] < today_str and not q["is_completed"]
         ]
         if overdue:
             return "dead"
 
-        urgent = [
-            q for q in app_state["quest_list"]
-            if q["due_date"] in (today_str, tomorrow_str)
-            and not q["is_completed"]
+        # 2. 마감이 오늘인 미완료 일정(D-Day)이 있는 경우 -> 화냄
+        d_day_quests = [
+            q for q in quests
+            if q["due_date"] == today_str and not q["is_completed"]
         ]
-        if urgent:
+        if d_day_quests:
+            return "angry"
+
+        # 3. 마감이 내일인 미완료 일정(D-1)이 있는 경우 -> 땀 흘림
+        d_1_quests = [
+            q for q in quests
+            if q["due_date"] == tomorrow_str and not q["is_completed"]
+        ]
+        if d_1_quests:
             return "nervous"
+
+        # 4. 과제가 없는 경우 -> 평상시
+        if not quests:
+            return "happy"
+
+        # 5. 모든 과제를 끝냈을 때 -> 신남
+        if all(q["is_completed"] for q in quests):
+            return "happy_heart"
+
     except Exception as e:
         print(f"나무늘보 상태 조회 에러: {e}")
 
+    # 기본값 (과제가 존재하며 미완료된 것이 있으나 마감이 2일 이상 남은 평상시)
     return "happy"
 
 
@@ -419,24 +442,40 @@ def _stop_monitor_thread():
 
 def draw_vector_sloth(canvas, x_center, y_center, scale=1.0, status="happy"):
     """
-    [함수 역할] 나무늘보 캐릭터 이미지 로드 및 기분(status: dead, nervous, happy)
-    에 따른 실시간 감정 표정 오버레이를 그립니다.
+    [함수 역할] 나무늘보 캐릭터 이미지 로드 및 기분(status: dead, nervous, angry, happy_heart, happy)
+    에 따른 실시간 감정을 보여줍니다.
     """
     canvas.delete("sloth_part")
     canvas.delete("sloth_image")
 
-    # 1. sloth.png 로드 및 크기 조정 (Pillow)
+    # 1. 상태에 맞는 이미지 파일명 설정
+    if status == "dead":
+        img_name = "sloth_dead.png"
+    elif status == "nervous":
+        img_name = "sloth_nervous.png"
+    elif status == "angry":
+        img_name = "sloth_angry.png"
+    elif status == "happy_heart":
+        img_name = "sloth_happy_heart.png"
+    else:
+        img_name = "sloth_happy_wave.png"
+
+    # 2. 이미지 로드 및 크기 조정 (Pillow)
     try:
         from PIL import Image, ImageTk
         import os
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        img_path = os.path.join(script_dir, "sloth.png")
+        img_path = os.path.join(script_dir, img_name)
+
+        # 이미지 파일이 없으면 기존 sloth.png를 백업으로 사용
+        if not os.path.exists(img_path):
+            img_path = os.path.join(script_dir, "sloth.png")
 
         if os.path.exists(img_path):
             img = Image.open(img_path)
-            # 120x120 크기로 변경
-            img_resized = img.resize((120, 120), Image.Resampling.LANCZOS)
-            app_state["sloth_image_data"] = ImageTk.PhotoImage(img_resized)
+            # 120x120 비율을 유지하며 최대 크기로 조정 (찌그러짐 방지)
+            img.thumbnail((120, 120), Image.Resampling.LANCZOS)
+            app_state["sloth_image_data"] = ImageTk.PhotoImage(img)
             # 이미지 생성
             canvas.create_image(
                 x_center,
@@ -455,196 +494,6 @@ def draw_vector_sloth(canvas, x_center, y_center, scale=1.0, status="happy"):
     except Exception as e:
         print(f"이미지 로딩 중 오류: {e}")
 
-    # 2. 상태(기분)에 따른 실시간 얼굴 표정 오버레이
-    # 기준 좌표 (120x120 이미지 기준 x_center=65, y_center=60일 때의 중심대비 상대좌표)
-    lx, ly = x_center - 20, y_center - 15
-    rx, ry = x_center + 4, y_center - 15
-    mx, my = x_center - 8, y_center - 9
-
-    if status == "dead":
-        # 1) 기존 눈 위에 갈색 패치를 씌워 덮음
-        canvas.create_oval(
-            lx - 7,
-            ly - 7,
-            lx + 7,
-            ly + 7,
-            fill="#70584e",
-            outline="",
-            tags="sloth_part")
-        canvas.create_oval(
-            rx - 7,
-            ry - 7,
-            rx + 7,
-            ry + 7,
-            fill="#70584e",
-            outline="",
-            tags="sloth_part")
-
-        # 2) X_X 눈 그리기
-        canvas.create_line(
-            lx - 4,
-            ly - 4,
-            lx + 4,
-            ly + 4,
-            fill="#000000",
-            width=2,
-            tags="sloth_part")
-        canvas.create_line(
-            lx + 4,
-            ly - 4,
-            lx - 4,
-            ly + 4,
-            fill="#000000",
-            width=2,
-            tags="sloth_part")
-        canvas.create_line(
-            rx - 4,
-            ry - 4,
-            rx + 4,
-            ry + 4,
-            fill="#000000",
-            width=2,
-            tags="sloth_part")
-        canvas.create_line(
-            rx + 4,
-            ry - 4,
-            rx - 4,
-            ry + 4,
-            fill="#000000",
-            width=2,
-            tags="sloth_part")
-
-        # 3) 눈물 흐르기
-        canvas.create_line(
-            lx,
-            ly + 5,
-            lx,
-            ly + 20,
-            fill="#5CA5F0",
-            width=3,
-            tags="sloth_part")
-        canvas.create_line(
-            rx,
-            ry + 5,
-            rx,
-            ry + 20,
-            fill="#5CA5F0",
-            width=3,
-            tags="sloth_part")
-
-        # 4) 기존 입을 크림색 패치로 덮고 울상 입 그리기
-        canvas.create_oval(
-            mx - 6,
-            my - 2,
-            mx + 6,
-            my + 3,
-            fill="#F5E5D5",
-            outline="",
-            tags="sloth_part")
-        canvas.create_arc(
-            mx - 5,
-            my - 2,
-            mx + 5,
-            my + 8,
-            start=0,
-            extent=180,
-            style="arc",
-            outline="#3E1D11",
-            width=2,
-            tags="sloth_part")
-
-        # 5) 텍스트 가이드
-        canvas.create_text(
-            x_center,
-            y_center + 50,
-            text="기절...",
-            font=(
-                "맑은 고딕",
-                9,
-                "bold"),
-            fill=RED_DANGER,
-            tags="sloth_part")
-
-    elif status == "nervous":
-        # 1) 눈썹 찌푸리기
-        canvas.create_line(
-            lx - 5,
-            ly - 8,
-            lx + 5,
-            ly - 10,
-            fill="#3E1D11",
-            width=2,
-            tags="sloth_part")
-        canvas.create_line(
-            rx - 5,
-            ry - 10,
-            rx + 5,
-            ry - 8,
-            fill="#3E1D11",
-            width=2,
-            tags="sloth_part")
-
-        # 2) 식은땀방울 그리기
-        canvas.create_oval(
-            x_center - 37,
-            y_center - 32,
-            x_center - 33,
-            y_center - 28,
-            fill="#5CA5F0",
-            outline="",
-            tags="sloth_part")
-        canvas.create_polygon([x_center - 35,
-                               y_center - 35,
-                               x_center - 37,
-                               y_center - 30,
-                               x_center - 33,
-                               y_center - 30],
-                              fill="#5CA5F0",
-                              outline="",
-                              tags="sloth_part")
-
-        # 3) 기존 입을 덮고 초조한 일자 입 그리기
-        canvas.create_oval(
-            mx - 6,
-            my - 2,
-            mx + 6,
-            my + 3,
-            fill="#F5E5D5",
-            outline="",
-            tags="sloth_part")
-        canvas.create_line(
-            mx - 5,
-            my,
-            mx + 5,
-            my,
-            fill="#3E1D11",
-            width=2,
-            tags="sloth_part")
-
-        # 4) 텍스트 가이드
-        canvas.create_text(
-            x_center,
-            y_center + 50,
-            text="마감 임박...",
-            font=(
-                "맑은 고딕",
-                9,
-                "bold"),
-            fill=ACCENT_ORANGE,
-            tags="sloth_part")
-
-    else:
-        # happy: 아무것도 덮지 않고 원본 이미지 그대로 노출 (여유 텍스트만 표시)
-        canvas.create_text(
-            x_center,
-            y_center + 50,
-            text="여유롭군",
-            font=(
-                "맑은 고딕",
-                9,
-                "bold"),
-            fill="#2E7D32",
-            tags="sloth_part")
 
 
 def draw_vector_stopwatch(canvas, pct):
@@ -872,11 +721,20 @@ def draw_home_view(parent):
     if sloth_status == "dead":
         msg_text = "기한 초과 일정이 있어\nSlo가 지쳐 쓰러졌습니다!"
         msg_color = RED_DANGER
+    elif sloth_status == "angry":
+        msg_text = "마감이 오늘인(D-Day)\n과제가 있습니다! 서두르세요!"
+        msg_color = RED_DANGER
     elif sloth_status == "nervous":
-        msg_text = "마감이 오늘/내일인\n일정이 있습니다. 서두르세요!"
+        msg_text = "마감이 하루 남은(D-1)\n과제가 있습니다. 집중하세요!"
         msg_color = ACCENT_ORANGE
+    elif sloth_status == "happy_heart":
+        msg_text = "모든 과제를 끝냈습니다!\n정말 대단해요!"
+        msg_color = "#2E7D32"
     else:
-        msg_text = "아주 평화롭습니다!\n여유롭게 과제를 해보세요."
+        if not app_state.get("quest_list", []):
+            msg_text = "과제가 없습니다!\n지금 당장 여유를 즐기세요."
+        else:
+            msg_text = "아주 평화롭습니다!\n여유롭게 과제를 해보세요."
         msg_color = "#2E7D32"
 
     status_msg_lbl = tk.Label(
@@ -2100,7 +1958,7 @@ def draw_quests_section(parent):
 
     # 2. 앞으로 해야 할 일정 (Upcoming Tasks)
     upcoming_quests = [q for q in app_state["quest_list"]
-                       if q["due_date"] > today_str and not q["is_completed"]]
+                       if q["due_date"] >= today_str and not q["is_completed"]]
     upcoming_quests = sorted(upcoming_quests, key=lambda x: x["due_date"])
     rem_count = len(upcoming_quests)
 

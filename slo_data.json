@@ -1,0 +1,83 @@
+{
+  "user": {
+    "level": 1,
+    "xp": 800,
+    "streak": 0,
+    "heart": 5,
+    "last_date": "2026-06-09",
+    "inventory": [
+      "orange_scarf"
+    ]
+  },
+  "quest_list": [
+    {
+      "id": "q1",
+      "title": "알고리즘 과제",
+      "difficulty": "Hard",
+      "due_date": "2026-06-09",
+      "xp_reward": 200,
+      "is_completed": true
+    },
+    {
+      "id": "q_1780988169120",
+      "title": "뿌지직뿡",
+      "difficulty": "Medium",
+      "due_date": "2026-06-09",
+      "xp_reward": 100,
+      "is_completed": true
+    },
+    {
+      "id": "q_1780988181555",
+      "title": "ㅇㅇㅇㅇㅇㅇ",
+      "difficulty": "Medium",
+      "due_date": "2026-06-09",
+      "xp_reward": 100,
+      "is_completed": true
+    },
+    {
+      "id": "q_1780988493819",
+      "title": "야호야호",
+      "difficulty": "Easy",
+      "due_date": "2026-06-11",
+      "xp_reward": 50,
+      "is_completed": true
+    },
+    {
+      "id": "q_1780990841913",
+      "title": "알고리즘 끝내기",
+      "difficulty": "Easy",
+      "due_date": "2026-06-11",
+      "xp_reward": 50,
+      "is_completed": true
+    },
+    {
+      "id": "q_1780997923428",
+      "title": "ㅇ",
+      "difficulty": "Medium",
+      "due_date": "2026-06-09",
+      "xp_reward": 100,
+      "is_completed": true
+    },
+    {
+      "id": "q_1780998150840",
+      "title": "dd",
+      "difficulty": "Medium",
+      "due_date": "2026-06-10",
+      "xp_reward": 100,
+      "is_completed": true
+    },
+    {
+      "id": "q_1780998158065",
+      "title": "dddd",
+      "difficulty": "Medium",
+      "due_date": "2026-06-09",
+      "xp_reward": 100,
+      "is_completed": true
+    }
+  ],
+  "equipped": {
+    "orange_scarf": true,
+    "sunglasses": false,
+    "crown": false
+  }
+}
